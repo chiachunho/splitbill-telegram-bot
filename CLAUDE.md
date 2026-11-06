@@ -174,14 +174,15 @@ All client reads and writes of `/api/**` go through **RTK Query** (`@reduxjs/too
 
 ### MCP server (`src/app/api/mcp/`, `src/lib/mcp/`, issues #147/#149)
 
-Stateless Streamable HTTP over `@modelcontextprotocol/sdk`, authenticated by personal `sbk_…` tokens kept as a sha256 in `agent_connections`. Full design in [`docs/architecture/mcp.md`](docs/architecture/mcp.md). The rules that are easy to break:
+Stateless Streamable HTTP over `@modelcontextprotocol/sdk`, authenticated by personal `sbk_…` tokens kept as a sha256 in `mcp_connections`. Full design in [`docs/architecture/mcp.md`](docs/architecture/mcp.md). The rules that are easy to break:
 
-- **`getAuth` must keep refusing `sbk_` tokens** and `getAgentAuth` must keep refusing everything else; REST and MCP are separate doors.
+- **Naming: code says `mcp`, the interface says 連結的應用程式, and "agent" means only the AI on the other end.** A connection can be n8n or a script, so tables, routes, types and the audit `source` are `mcp_*` / `Mcp*` / `"mcp"` (#155 shipped them as `agent_*`; `migrations/0005-rename-agent-to-mcp.ts` renamed them). Not `app_*` either: `"app"` already means the Mini App / Web App, and `src/app/app/` is the Web App. Users see 連結的應用程式, MCP 伺服器網址 and 個人存取權杖, never AI 助理.
+- **`getAuth` must keep refusing `sbk_` tokens** and `getMcpAuth` must keep refusing everything else; REST and MCP are separate doors.
 - **Every tool goes through `openGroup`** (rate limit → `assertGroupMember` → `assertGrant`), checked on every call. A new tool never reads a group before it.
-- Writes go through `src/lib/records/` with `actor: { source: "agent", agentConnectionId }`; never insert expense rows from a tool.
+- Writes go through `src/lib/records/` with `actor: { source: "mcp", mcpConnectionId }`; never insert expense rows from a tool.
 - **Results carry the data as `structuredContent` and as one JSON text block in `content`** (some clients show a model only `content`). The first text block is a fixed sentence of ids and numbers; user-controlled text (descriptions, names) appears only as string values inside the JSON, never in prose.
-- People are matched exactly within the group and never guessed (`agent-names.ts`).
-- A new column referencing `users.id` on connection tables is moved in `mergeAccounts` (`agent_connections` is).
+- People are matched exactly within the group and never guessed (`mcp/names.ts`).
+- A new column referencing `users.id` on connection tables is moved in `mergeAccounts` (`mcp_connections` is).
 
 ### Help site (`src/app/help/`)
 
@@ -255,7 +256,7 @@ Requests: the Mini App's store uses `tmaRawFetch` (`src/lib/tma-fetch.ts`, attac
 ### Database (`src/db/`)
 
 Drizzle ORM + Neon Serverless Postgres. Tables defined in `src/db/schema.ts`:
-`users` (`display_name` / `avatar_source`: see [`docs/architecture/auth.md`](docs/architecture/auth.md)) → `groups` (identified by `(chat_type, chat_id)`, see below) → `group_members` (join) → `expenses` → `expense_payers` + `expense_splits` + `expense_receipts` → `exchange_rates` + `group_exchange_rates` + `auth_identities` + `sessions` + `account_merge_tickets` + `receipt_awaiting` + `add_awaiting` + `group_delete_requests` + `group_invites` + `record_audit_log` + `user_beancount_configs` (per-user, per-group beancount export: three accounts and the `last_exported_at` watermark; `UNIQUE(user_id, group_id)`; `corrections_since` = when the last file was built) + `push_subscriptions` (one row per device receiving push; see "Home screen and push") + `rate_limit_hits` (attempt counters, `(key, window_start)`; see the invite rules below; also the MCP per-connection limits) + `agent_connections` (MCP tokens, see "MCP server") + `agent_idempotency`. `group_members.push_muted` is the per-group push switch.
+`users` (`display_name` / `avatar_source`: see [`docs/architecture/auth.md`](docs/architecture/auth.md)) → `groups` (identified by `(chat_type, chat_id)`, see below) → `group_members` (join) → `expenses` → `expense_payers` + `expense_splits` + `expense_receipts` → `exchange_rates` + `group_exchange_rates` + `auth_identities` + `sessions` + `account_merge_tickets` + `receipt_awaiting` + `add_awaiting` + `group_delete_requests` + `group_invites` + `record_audit_log` + `user_beancount_configs` (per-user, per-group beancount export: three accounts and the `last_exported_at` watermark; `UNIQUE(user_id, group_id)`; `corrections_since` = when the last file was built) + `push_subscriptions` (one row per device receiving push; see "Home screen and push") + `rate_limit_hits` (attempt counters, `(key, window_start)`; see the invite rules below; also the MCP per-connection limits) + `mcp_connections` (MCP tokens, see "MCP server") + `mcp_idempotency`. `group_members.push_muted` is the per-group push switch.
 
 **A group's chat is `(chat_type, chat_id)`**, not a Telegram-only column: `chat_type` is `'telegram'` today (room for other platforms), `chat_id` is text, both NULL together (`groups_chat_pair` CHECK) and `UNIQUE(chat_type, chat_id)`. **Never read or query these two columns directly — go through `src/lib/chat.ts`** (`telegramChatId(group)`, `requireTelegramChatId(group)`, `whereTelegramChat(id)`, `telegramChatColumns(id)`). A query that forgets `chat_type` doesn't error; it silently matches the wrong group once another platform issues the same id. `chatMigration` rewrites both columns when a chat is upgraded to a supergroup.
 
@@ -362,7 +363,7 @@ Creating, editing and deleting an expense or settlement lives in one place: `cre
 ### Audit log (`src/lib/record-mutation.ts` + `record-audit.ts` + `record-history.ts`)
 
 Every create, edit and delete of a record is logged to `record_audit_log` with
-who did it, from which surface (`bot` / `app` / `agent`; an `agent` write also carries `agent_connection_id`, a plain nullable column until the connections table exists), and a full before/after snapshot. This is the
+who did it, from which surface (`bot` / `app` / `mcp`; an `mcp` write also carries `mcp_connection_id`, a plain nullable column until the connections table exists), and a full before/after snapshot. This is the
 accounting half of "any member may edit anything" — without it, relaxing the
 owner lock would mean changes are both unrestricted _and_ untraceable.
 

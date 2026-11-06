@@ -1,7 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { NextResponse } from "next/server";
 
-import { getAgentAuth } from "@/lib/auth/agent";
+import { getMcpAuth } from "@/lib/auth/mcp";
 import { HttpError } from "@/lib/auth/errors";
 import { createMcpServer } from "@/lib/mcp/server";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 async function handle(req: Request): Promise<Response> {
   let auth;
   try {
-    auth = await getAgentAuth(req);
+    auth = await getMcpAuth(req);
   } catch (err) {
     if (err instanceof HttpError) {
       return NextResponse.json(

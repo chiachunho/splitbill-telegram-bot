@@ -423,17 +423,16 @@ export const recordAuditLog = pgTable(
     actorId: integer("actor_id")
       .notNull()
       .references(() => users.id),
-    /** Which surface the change came from: 'bot' | 'app' | 'agent'. */
+    /** Which surface the change came from: 'bot' | 'app' | 'mcp'. */
     source: varchar("source", { length: 8 }).notNull(),
     /**
-     * The MCP connection behind an 'agent' change. `ON DELETE SET NULL`: the
+     * The MCP connection behind an 'mcp' change. `ON DELETE SET NULL`: the
      * log outlives the connection (connections are revoked, not deleted, so the
      * name normally stays readable).
      */
-    agentConnectionId: integer("agent_connection_id").references(
-      (): AnyPgColumn => agentConnections.id,
-      { onDelete: "set null" },
-    ),
+    mcpConnectionId: integer("mcp_connection_id").references((): AnyPgColumn => mcpConnections.id, {
+      onDelete: "set null",
+    }),
     /** RecordSnapshot; NULL on 'created'. */
     before: jsonb("before"),
     /** RecordSnapshot, or the rate-lock payload; NULL on 'deleted'. */
@@ -565,8 +564,8 @@ export const rateLimitHits = pgTable(
  * stored, so a database leak can't be replayed; `token_prefix` is for display.
  * A revoked connection keeps its row so audit entries can still name it.
  */
-export const agentConnections = pgTable(
-  "agent_connections",
+export const mcpConnections = pgTable(
+  "mcp_connections",
   {
     id: serial("id").primaryKey(),
     userId: integer("user_id")
@@ -589,7 +588,7 @@ export const agentConnections = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("agent_connections_user_idx").on(t.userId)],
+  (t) => [index("mcp_connections_user_idx").on(t.userId)],
 );
 
 /**
@@ -597,24 +596,24 @@ export const agentConnections = pgTable(
  * original record instead of a second one. `record_id` is NULL while the first call is
  * still running. Rows older than 24 h are ignored and swept on use.
  */
-export const agentIdempotency = pgTable(
-  "agent_idempotency",
+export const mcpIdempotency = pgTable(
+  "mcp_idempotency",
   {
     id: serial("id").primaryKey(),
     connectionId: integer("connection_id")
       .notNull()
-      .references(() => agentConnections.id, { onDelete: "cascade" }),
+      .references(() => mcpConnections.id, { onDelete: "cascade" }),
     key: varchar("key", { length: 128 }).notNull(),
     recordId: integer("record_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    unique("agent_idempotency_key_uniq").on(t.connectionId, t.key),
-    index("agent_idempotency_created_idx").on(t.createdAt),
+    unique("mcp_idempotency_key_uniq").on(t.connectionId, t.key),
+    index("mcp_idempotency_created_idx").on(t.createdAt),
   ],
 );
 
-export type AgentConnection = typeof agentConnections.$inferSelect;
+export type McpConnection = typeof mcpConnections.$inferSelect;
 
 /**
  * Applied data migrations (scripts/migrate.ts creates it with the same shape).

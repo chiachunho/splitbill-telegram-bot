@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assertGrant, grantCovers, type Grant } from "@/lib/agent-grant";
+import { assertGrant, grantCovers, type Grant } from "@/lib/mcp/grant";
 import { ForbiddenError } from "@/lib/auth/errors";
 
 const grant = (over: Partial<Grant> = {}): Grant => ({

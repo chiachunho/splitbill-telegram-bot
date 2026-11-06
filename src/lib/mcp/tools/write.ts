@@ -4,11 +4,11 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { db } from "@/db";
 import { expensePayers, expenses } from "@/db/schema";
-import { parseAgentAmount } from "@/lib/agent-amount";
-import { bindKey, claimKey, duplicateSince, releaseKey } from "@/lib/agent-idempotency";
-import { resolveMember } from "@/lib/agent-names";
-import { buildExpenseInput, type AgentPayer, type AgentSplit } from "@/lib/agent-split";
-import type { AgentAuth } from "@/lib/auth/agent";
+import { parseMcpAmount } from "@/lib/mcp/amount";
+import { bindKey, claimKey, duplicateSince, releaseKey } from "@/lib/mcp/idempotency";
+import { resolveMember } from "@/lib/mcp/names";
+import { buildExpenseInput, type McpPayer, type McpSplit } from "@/lib/mcp/split";
+import type { McpAuth } from "@/lib/auth/mcp";
 import { todayIn } from "@/lib/day";
 import { createExpense, createSettlement } from "@/lib/records";
 import {
@@ -92,16 +92,16 @@ function resolveCurrency(
   return currency as SupportedCurrency;
 }
 
-const agentActor = (auth: AgentAuth) => ({
+const mcpActor = (auth: McpAuth) => ({
   userId: auth.user.id,
-  source: "agent" as const,
-  agentConnectionId: auth.grant.connectionId,
+  source: "mcp" as const,
+  mcpConnectionId: auth.grant.connectionId,
 });
 
 type Reservation = { release: () => Promise<void>; bind: (id: number) => Promise<void> };
 
 /** Handles `idempotencyKey`; returns an early result for a repeat, else a reservation. */
-async function reserve(auth: AgentAuth, key: string | undefined) {
+async function reserve(auth: McpAuth, key: string | undefined) {
   if (!key) return { reservation: null as Reservation | null };
   const connId = auth.grant.connectionId;
   const claim = await claimKey(connId, key);
@@ -127,7 +127,7 @@ async function reserve(auth: AgentAuth, key: string | undefined) {
   };
 }
 
-export function registerWriteTools(server: McpServer, auth: AgentAuth) {
+export function registerWriteTools(server: McpServer, auth: McpAuth) {
   server.registerTool(
     "add_expense",
     {
@@ -166,7 +166,7 @@ export function registerWriteTools(server: McpServer, auth: AgentAuth) {
         });
         const find = makeResolver(members, auth.user.id);
 
-        const parsed = parseAgentAmount(args.amount);
+        const parsed = parseMcpAmount(args.amount);
         if (!parsed.ok) throw new ToolError("bad_request", parsed.message);
         const currency = resolveCurrency(args.currency, parsed.currency, group.defaultCurrency);
         const spentAt = args.spentAt ?? todayIn(group.timezone);
@@ -174,26 +174,26 @@ export function registerWriteTools(server: McpServer, auth: AgentAuth) {
         if (args.payers && args.paidBy !== undefined) {
           throw new ToolError("bad_request", "use paidBy or payers, not both");
         }
-        const payers: AgentPayer[] = args.payers
+        const payers: McpPayer[] = args.payers
           ? args.payers.map((p) => ({ userId: find(p.member).id, amount: p.amount }))
           : [{ userId: args.paidBy !== undefined ? find(args.paidBy).id : auth.user.id }];
 
         const split = args.split ?? { type: "equal" as const };
-        let agentSplit: AgentSplit;
+        let mcpSplit: McpSplit;
         if (split.type === "equal") {
-          agentSplit = {
+          mcpSplit = {
             type: "equal",
             userIds: split.among
               ? split.among.map((r) => find(r).id)
               : members.filter((m) => m.active).map((m) => m.id),
           };
         } else if (split.type === "shares") {
-          agentSplit = {
+          mcpSplit = {
             type: "shares",
             shares: split.shares.map((s) => ({ userId: find(s.member).id, weight: s.weight })),
           };
         } else {
-          agentSplit = {
+          mcpSplit = {
             type: "exact",
             amounts: split.amounts.map((s) => ({ userId: find(s.member).id, amount: s.amount })),
           };
@@ -205,7 +205,7 @@ export function registerWriteTools(server: McpServer, auth: AgentAuth) {
           description: args.description || null,
           spentAt,
           payers,
-          split: agentSplit,
+          split: mcpSplit,
         });
         if (!built.ok) throw new ToolError("bad_request", built.message);
 
@@ -260,7 +260,7 @@ export function registerWriteTools(server: McpServer, auth: AgentAuth) {
             }
           }
           const { id } = await createExpense(args.groupId, built.input, {
-            actor: agentActor(auth),
+            actor: mcpActor(auth),
           });
           // The record exists now: a failed bind must not free the key, or a retry would
           // book it twice.
@@ -296,7 +296,7 @@ export function registerWriteTools(server: McpServer, auth: AgentAuth) {
       guarded(async () => {
         const { group, members } = await openGroup(auth, args.groupId, "write");
         const find = makeResolver(members, auth.user.id);
-        const parsed = parseAgentAmount(args.amount);
+        const parsed = parseMcpAmount(args.amount);
         if (!parsed.ok) throw new ToolError("bad_request", parsed.message);
         const currency = resolveCurrency(args.currency, parsed.currency, group.defaultCurrency);
         const fromId = args.from !== undefined ? find(args.from).id : auth.user.id;
@@ -322,7 +322,7 @@ export function registerWriteTools(server: McpServer, auth: AgentAuth) {
 
         try {
           const { id } = await createSettlement(args.groupId, input.data, {
-            actor: agentActor(auth),
+            actor: mcpActor(auth),
           });
           await reservation?.bind(id).catch((err) => console.error("[mcp] bindKey failed", err));
           return ok(`created settlement ${id}`, {

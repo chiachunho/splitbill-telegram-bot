@@ -3,9 +3,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { db } from "@/db";
 import { groupMembers, groups } from "@/db/schema";
-import { grantCovers } from "@/lib/agent-grant";
-import type { AgentAuth } from "@/lib/auth/agent";
-import { enforceAgentRateLimit } from "@/lib/rate-limit";
+import { grantCovers } from "@/lib/mcp/grant";
+import type { McpAuth } from "@/lib/auth/mcp";
+import { enforceMcpRateLimit } from "@/lib/rate-limit";
 import { idSchema, SUPPORTED_CURRENCIES } from "@/lib/zod";
 import { computeGroupBalances, minimizeTransfers } from "@/lib/settlement";
 
@@ -14,7 +14,7 @@ import { guarded, ok } from "../result";
 
 const READ = { readOnlyHint: true, openWorldHint: false } as const;
 
-export function registerGroupTools(server: McpServer, auth: AgentAuth) {
+export function registerGroupTools(server: McpServer, auth: McpAuth) {
   server.registerTool(
     "list_groups",
     {
@@ -26,7 +26,7 @@ export function registerGroupTools(server: McpServer, auth: AgentAuth) {
     },
     () =>
       guarded(async () => {
-        await enforceAgentRateLimit(auth.grant.connectionId, "read");
+        await enforceMcpRateLimit(auth.grant.connectionId, "read");
         const mine = await db
           .select({ id: groups.id, title: groups.title, defaultCurrency: groups.defaultCurrency })
           .from(groupMembers)

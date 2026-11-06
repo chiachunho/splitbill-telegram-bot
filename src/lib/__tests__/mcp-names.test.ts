@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveMember } from "@/lib/agent-names";
+import { resolveMember } from "@/lib/mcp/names";
 
 const m = (
   id: number,

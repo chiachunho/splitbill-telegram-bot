@@ -13,7 +13,7 @@ import {
   groupMembers,
   groups,
   pushSubscriptions,
-  agentConnections,
+  mcpConnections,
   sessions,
   userBeancountConfigs,
   users,
@@ -322,9 +322,9 @@ export async function mergeAccounts(
     .where(eq(pushSubscriptions.userId, absorbId));
   // MCP connections follow the person; otherwise the cascade would revoke them silently.
   await tx
-    .update(agentConnections)
+    .update(mcpConnections)
     .set({ userId: keepId })
-    .where(eq(agentConnections.userId, absorbId));
+    .where(eq(mcpConnections.userId, absorbId));
 
   // telegram_id is unique: clear it on the absorbed row before the kept row takes it.
   const fill = mergedProfileFields(keep, absorb);

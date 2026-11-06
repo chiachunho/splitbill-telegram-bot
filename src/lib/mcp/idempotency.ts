@@ -1,7 +1,7 @@
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 
 import { db } from "@/db";
-import { agentIdempotency } from "@/db/schema";
+import { mcpIdempotency } from "@/db/schema";
 
 /** A key is remembered this long; a resend after it creates a new record. */
 export const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
@@ -30,26 +30,26 @@ export async function claimKey(
   now = new Date(),
 ): Promise<Claim> {
   await db
-    .delete(agentIdempotency)
+    .delete(mcpIdempotency)
     .where(
       or(
-        lt(agentIdempotency.createdAt, idempotencyCutoff(now)),
+        lt(mcpIdempotency.createdAt, idempotencyCutoff(now)),
         and(
-          isNull(agentIdempotency.recordId),
-          lt(agentIdempotency.createdAt, new Date(now.getTime() - CLAIM_STALE_MS)),
+          isNull(mcpIdempotency.recordId),
+          lt(mcpIdempotency.createdAt, new Date(now.getTime() - CLAIM_STALE_MS)),
         ),
       ),
     );
   const inserted = await db
-    .insert(agentIdempotency)
+    .insert(mcpIdempotency)
     .values({ connectionId, key, createdAt: now })
     .onConflictDoNothing()
-    .returning({ id: agentIdempotency.id });
+    .returning({ id: mcpIdempotency.id });
   if (inserted.length > 0) return { status: "claimed" };
   const [row] = await db
-    .select({ recordId: agentIdempotency.recordId })
-    .from(agentIdempotency)
-    .where(and(eq(agentIdempotency.connectionId, connectionId), eq(agentIdempotency.key, key)));
+    .select({ recordId: mcpIdempotency.recordId })
+    .from(mcpIdempotency)
+    .where(and(eq(mcpIdempotency.connectionId, connectionId), eq(mcpIdempotency.key, key)));
   return row?.recordId != null
     ? { status: "duplicate", recordId: row.recordId }
     : { status: "in_progress" };
@@ -57,14 +57,14 @@ export async function claimKey(
 
 export async function bindKey(connectionId: number, key: string, recordId: number): Promise<void> {
   await db
-    .update(agentIdempotency)
+    .update(mcpIdempotency)
     .set({ recordId })
-    .where(and(eq(agentIdempotency.connectionId, connectionId), eq(agentIdempotency.key, key)));
+    .where(and(eq(mcpIdempotency.connectionId, connectionId), eq(mcpIdempotency.key, key)));
 }
 
 /** Gives the key back (the call failed or was held for confirmation), so a retry can use it. */
 export async function releaseKey(connectionId: number, key: string): Promise<void> {
   await db
-    .delete(agentIdempotency)
-    .where(and(eq(agentIdempotency.connectionId, connectionId), eq(agentIdempotency.key, key)));
+    .delete(mcpIdempotency)
+    .where(and(eq(mcpIdempotency.connectionId, connectionId), eq(mcpIdempotency.key, key)));
 }

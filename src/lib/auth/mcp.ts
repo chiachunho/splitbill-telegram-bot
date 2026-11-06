@@ -1,14 +1,14 @@
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { agentConnections, users } from "@/db/schema";
-import type { Grant } from "@/lib/agent-grant";
-import { hashToken, parseBearerToken } from "@/lib/agent-token";
+import { mcpConnections, users } from "@/db/schema";
+import type { Grant } from "@/lib/mcp/grant";
+import { hashToken, parseBearerToken } from "@/lib/mcp/token";
 
 import type { Auth } from "./index";
 import { UnauthorizedError } from "./errors";
 
-export type AgentAuth = Auth & { grant: Grant };
+export type McpAuth = Auth & { grant: Grant };
 
 /** `last_used_at` is refreshed at most this often, so a read doesn't cost a write. */
 const TOUCH_MS = 60_000;
@@ -18,15 +18,15 @@ const TOUCH_MS = 60_000;
  * every call. Group membership is checked per tool (`assertGroupMember`), also every call.
  * `getAuth` deliberately does not accept these tokens, so REST stays closed to agents.
  */
-export async function getAgentAuth(req: Request): Promise<AgentAuth> {
+export async function getMcpAuth(req: Request): Promise<McpAuth> {
   const token = parseBearerToken(req.headers.get("authorization"));
   if (!token) throw new UnauthorizedError("missing or malformed bearer token");
 
   const [row] = await db
-    .select({ conn: agentConnections, user: users })
-    .from(agentConnections)
-    .innerJoin(users, eq(users.id, agentConnections.userId))
-    .where(eq(agentConnections.tokenHash, hashToken(token)));
+    .select({ conn: mcpConnections, user: users })
+    .from(mcpConnections)
+    .innerJoin(users, eq(users.id, mcpConnections.userId))
+    .where(eq(mcpConnections.tokenHash, hashToken(token)));
   const now = new Date();
   if (!row || row.conn.revokedAt || (row.conn.expiresAt && row.conn.expiresAt <= now)) {
     throw new UnauthorizedError("invalid, revoked or expired token");
@@ -35,14 +35,14 @@ export async function getAgentAuth(req: Request): Promise<AgentAuth> {
   const { conn } = row;
   if (!conn.lastUsedAt || now.getTime() - conn.lastUsedAt.getTime() > TOUCH_MS) {
     await db
-      .update(agentConnections)
+      .update(mcpConnections)
       .set({ lastUsedAt: now })
       .where(
         and(
-          eq(agentConnections.id, conn.id),
+          eq(mcpConnections.id, conn.id),
           or(
-            isNull(agentConnections.lastUsedAt),
-            lt(agentConnections.lastUsedAt, sql`now() - interval '1 minute'`),
+            isNull(mcpConnections.lastUsedAt),
+            lt(mcpConnections.lastUsedAt, sql`now() - interval '1 minute'`),
           ),
         ),
       )

@@ -2,12 +2,12 @@ import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { groupMembers, groups, users } from "@/db/schema";
-import { assertGrant, type AgentAccess } from "@/lib/agent-grant";
+import { assertGrant, type McpAccess } from "@/lib/mcp/grant";
 import { assertGroupMember } from "@/lib/auth";
-import type { AgentAuth } from "@/lib/auth/agent";
+import type { McpAuth } from "@/lib/auth/mcp";
 import { NotFoundError } from "@/lib/auth/errors";
 import { memberLabels } from "@/lib/label";
-import { enforceAgentRateLimit } from "@/lib/rate-limit";
+import { enforceMcpRateLimit } from "@/lib/rate-limit";
 
 export type McpMember = {
   id: number;
@@ -47,12 +47,12 @@ export async function loadMembers(groupId: number): Promise<McpMember[]> {
 
 /** Counts the call, then checks membership and the grant — in that order, every call. */
 export async function openGroup(
-  auth: AgentAuth,
+  auth: McpAuth,
   groupId: number,
-  need: AgentAccess,
-  opts: { countAs?: AgentAccess } = {},
+  need: McpAccess,
+  opts: { countAs?: McpAccess } = {},
 ) {
-  await enforceAgentRateLimit(auth.grant.connectionId, opts.countAs ?? need);
+  await enforceMcpRateLimit(auth.grant.connectionId, opts.countAs ?? need);
   await assertGroupMember(auth.user.id, groupId);
   assertGrant(auth.grant, groupId, need);
   const [group] = await db.select().from(groups).where(eq(groups.id, groupId));

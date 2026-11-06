@@ -14,7 +14,7 @@ vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 
 import { getAuth } from "@/lib/auth";
 import { UnauthorizedError } from "@/lib/auth/errors";
-import { generateToken } from "@/lib/agent-token";
+import { generateToken } from "@/lib/mcp/token";
 
 describe("getAuth", () => {
   it("does not accept an MCP token, so REST stays closed to agents", async () => {

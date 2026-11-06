@@ -3,7 +3,7 @@ import { z } from "zod";
 import { idSchema } from "@/lib/zod";
 
 /** At most this many live connections per person. */
-export const MAX_AGENT_CONNECTIONS = 20;
+export const MAX_MCP_CONNECTIONS = 20;
 
 export const createConnectionSchema = z
   .object({

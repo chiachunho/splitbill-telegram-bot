@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { allocateByWeights, buildExpenseInput, type AgentSplit } from "@/lib/agent-split";
+import { allocateByWeights, buildExpenseInput, type McpSplit } from "@/lib/mcp/split";
 
 const base = { currency: "TWD", description: null, spentAt: "2026-11-06" } as const;
 
@@ -73,7 +73,7 @@ describe("buildExpenseInput", () => {
   });
 
   it("several payers need amounts that add up", () => {
-    const split: AgentSplit = { type: "equal", userIds: [1, 2] };
+    const split: McpSplit = { type: "equal", userIds: [1, 2] };
     expect(
       buildExpenseInput({ ...base, amount: 100, payers: [{ userId: 1 }, { userId: 2 }], split }),
     ).toMatchObject({ ok: false });

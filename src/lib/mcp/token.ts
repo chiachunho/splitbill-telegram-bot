@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 /**
  * Personal MCP tokens (issue #149): `sbk_` + 32 random bytes in base64url. Made, shown
- * once and hashed here; `getAgentAuth` parses and hashes with the same functions, so the
+ * once and hashed here; `getMcpAuth` parses and hashes with the same functions, so the
  * two ends can't drift. A fast hash is enough: the token is 256 random bits, not a password.
  */
 export const TOKEN_PREFIX = "sbk_";

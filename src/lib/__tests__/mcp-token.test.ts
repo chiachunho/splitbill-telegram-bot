@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { generateToken, hashToken, parseBearerToken, tokenDisplayPrefix } from "@/lib/agent-token";
+import { generateToken, hashToken, parseBearerToken, tokenDisplayPrefix } from "@/lib/mcp/token";
 
-describe("agent tokens", () => {
+describe("MCP tokens", () => {
   it("a generated token is read back from a Bearer header", () => {
     const t = generateToken();
     expect(parseBearerToken(`Bearer ${t}`)).toBe(t);

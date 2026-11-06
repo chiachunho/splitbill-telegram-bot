@@ -2,9 +2,9 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/db";
-import { agentConnections, groupMembers } from "@/db/schema";
-import { createConnectionSchema, MAX_AGENT_CONNECTIONS } from "@/lib/agent-connection-input";
-import { generateToken, hashToken, tokenDisplayPrefix } from "@/lib/agent-token";
+import { mcpConnections, groupMembers } from "@/db/schema";
+import { createConnectionSchema, MAX_MCP_CONNECTIONS } from "@/lib/mcp/connection-input";
+import { generateToken, hashToken, tokenDisplayPrefix } from "@/lib/mcp/token";
 import { getAuth } from "@/lib/auth";
 import { BadRequestError } from "@/lib/auth/errors";
 import { withAuth } from "@/lib/auth/route";
@@ -13,17 +13,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const publicColumns = {
-  id: agentConnections.id,
-  kind: agentConnections.kind,
-  name: agentConnections.name,
-  tokenPrefix: agentConnections.tokenPrefix,
-  access: agentConnections.access,
-  allGroups: agentConnections.allGroups,
-  groupIds: agentConnections.groupIds,
-  lastUsedAt: agentConnections.lastUsedAt,
-  expiresAt: agentConnections.expiresAt,
-  revokedAt: agentConnections.revokedAt,
-  createdAt: agentConnections.createdAt,
+  id: mcpConnections.id,
+  kind: mcpConnections.kind,
+  name: mcpConnections.name,
+  tokenPrefix: mcpConnections.tokenPrefix,
+  access: mcpConnections.access,
+  allGroups: mcpConnections.allGroups,
+  groupIds: mcpConnections.groupIds,
+  lastUsedAt: mcpConnections.lastUsedAt,
+  expiresAt: mcpConnections.expiresAt,
+  revokedAt: mcpConnections.revokedAt,
+  createdAt: mcpConnections.createdAt,
 };
 
 /** The caller's connections, newest first, never the hash. */
@@ -31,9 +31,9 @@ export const GET = withAuth(async (req: Request) => {
   const auth = await getAuth(req);
   const rows = await db
     .select(publicColumns)
-    .from(agentConnections)
-    .where(eq(agentConnections.userId, auth.user.id))
-    .orderBy(desc(agentConnections.createdAt));
+    .from(mcpConnections)
+    .where(eq(mcpConnections.userId, auth.user.id))
+    .orderBy(desc(mcpConnections.createdAt));
   return NextResponse.json({ connections: rows });
 });
 
@@ -59,16 +59,16 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   const live = await db
-    .select({ id: agentConnections.id })
-    .from(agentConnections)
-    .where(and(eq(agentConnections.userId, auth.user.id), isNull(agentConnections.revokedAt)));
-  if (live.length >= MAX_AGENT_CONNECTIONS) {
-    throw new BadRequestError(`at most ${MAX_AGENT_CONNECTIONS} active connections`);
+    .select({ id: mcpConnections.id })
+    .from(mcpConnections)
+    .where(and(eq(mcpConnections.userId, auth.user.id), isNull(mcpConnections.revokedAt)));
+  if (live.length >= MAX_MCP_CONNECTIONS) {
+    throw new BadRequestError(`at most ${MAX_MCP_CONNECTIONS} active connections`);
   }
 
   const token = generateToken();
   const [row] = await db
-    .insert(agentConnections)
+    .insert(mcpConnections)
     .values({
       userId: auth.user.id,
       kind: "token",

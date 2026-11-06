@@ -1,7 +1,7 @@
 import { normalizeWidth, scanAmount } from "@/lib/parseAdd";
 import { SUPPORTED_CURRENCIES, type SupportedCurrency } from "@/lib/zod";
 
-export type AgentAmount =
+export type McpAmount =
   { ok: true; amount: number; currency: SupportedCurrency | null } | { ok: false; message: string };
 
 const isSupported = (c: string): c is SupportedCurrency =>
@@ -12,7 +12,7 @@ const isSupported = (c: string): c is SupportedCurrency =>
  * (`1,200`, `$300`, `3k`, `150+200`). A currency written into the text is returned so the
  * caller can compare it with the `currency` argument. Anything left over is refused.
  */
-export function parseAgentAmount(raw: number | string): AgentAmount {
+export function parseMcpAmount(raw: number | string): McpAmount {
   if (typeof raw === "number") {
     const rounded = Math.round(raw * 100) / 100;
     return Number.isFinite(rounded) && rounded > 0

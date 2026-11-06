@@ -20,14 +20,14 @@ vi.mock("@/db", () => ({
   ),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({ enforceAgentRateLimit: vi.fn() }));
+vi.mock("@/lib/rate-limit", () => ({ enforceMcpRateLimit: vi.fn() }));
 
 import { UnauthorizedError } from "@/lib/auth/errors";
 
-const agent = vi.hoisted(() => ({ authed: false }));
-vi.mock("@/lib/auth/agent", () => ({
-  getAgentAuth: vi.fn(async () => {
-    if (!agent.authed) throw new UnauthorizedError("invalid, revoked or expired token");
+const mcpAuth = vi.hoisted(() => ({ authed: false }));
+vi.mock("@/lib/auth/mcp", () => ({
+  getMcpAuth: vi.fn(async () => {
+    if (!mcpAuth.authed) throw new UnauthorizedError("invalid, revoked or expired token");
     return {
       user: { id: 1 },
       grant: { connectionId: 1, access: "write", allGroups: true, groupIds: [] },
@@ -50,7 +50,7 @@ const rpc = (body: unknown) =>
 
 beforeEach(() => {
   state.dbTouched = false;
-  agent.authed = false;
+  mcpAuth.authed = false;
 });
 
 describe("/api/mcp", () => {
@@ -67,7 +67,7 @@ describe("/api/mcp", () => {
   });
 
   it("lists the core tools, with write tools marked as such", async () => {
-    agent.authed = true;
+    mcpAuth.authed = true;
     const res = await POST(rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" }));
     expect(res.status).toBe(200);
     const json = (await res.json()) as {

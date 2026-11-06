@@ -32,8 +32,8 @@ export const RATE_RULES = {
   /** Bot `/link`, by chat, so a room of accounts can't multiply the sender limit. */
   linkChat: { name: "link:chat", limit: 20, windowMs: 10 * MINUTE },
   /** MCP tool calls per connection (issue #149): reads and writes are counted apart. */
-  agentRead: { name: "agent:read", limit: 600, windowMs: 60 * MINUTE },
-  agentWrite: { name: "agent:write", limit: 60, windowMs: 60 * MINUTE },
+  mcpRead: { name: "mcp:read", limit: 600, windowMs: 60 * MINUTE },
+  mcpWrite: { name: "mcp:write", limit: 60, windowMs: 60 * MINUTE },
 } as const satisfies Record<string, RateRule>;
 
 /** What a refused request answers. Lives in DB-free code so the join page can match it. */

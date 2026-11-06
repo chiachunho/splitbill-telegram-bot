@@ -7,8 +7,8 @@ import { expenseInputSchema, type ExpenseInput, type SupportedCurrency } from "@
  * forms, and the result still goes through the same schema the REST route uses.
  */
 
-export type AgentPayer = { userId: number; amount?: number };
-export type AgentSplit =
+export type McpPayer = { userId: number; amount?: number };
+export type McpSplit =
   | { type: "equal"; userIds: number[] }
   | { type: "shares"; shares: { userId: number; weight: number }[] }
   | { type: "exact"; amounts: { userId: number; amount: number }[] };
@@ -42,8 +42,8 @@ export function buildExpenseInput(args: {
   currency: SupportedCurrency;
   description: string | null;
   spentAt: string;
-  payers: AgentPayer[];
-  split: AgentSplit;
+  payers: McpPayer[];
+  split: McpSplit;
   fxRate?: number | null;
 }): BuildResult {
   const { amount, payers, split } = args;

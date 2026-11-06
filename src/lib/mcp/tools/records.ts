@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { db } from "@/db";
 import { expensePayers, expenseSplits, expenses } from "@/db/schema";
-import type { AgentAuth } from "@/lib/auth/agent";
+import type { McpAuth } from "@/lib/auth/mcp";
 import { encodeExpenseCursor, EXPENSES_PAGE_SIZE, parseExpenseCursor } from "@/lib/expense-cursor";
 import { n } from "@/lib/money";
 import { daySchema, idSchema } from "@/lib/zod";
@@ -17,7 +17,7 @@ const READ = { readOnlyHint: true, openWorldHint: false } as const;
 type Labels = Map<number, string>;
 
 /** Records with their payers and splits, shaped for an agent. */
-export async function loadAgentRecords(groupId: number, ids: number[], labels: Labels) {
+export async function loadMcpRecords(groupId: number, ids: number[], labels: Labels) {
   if (ids.length === 0) return [];
   const [rows, payers, splits] = await Promise.all([
     db
@@ -67,7 +67,7 @@ export async function loadAgentRecords(groupId: number, ids: number[], labels: L
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
-export function registerRecordTools(server: McpServer, auth: AgentAuth) {
+export function registerRecordTools(server: McpServer, auth: McpAuth) {
   server.registerTool(
     "list_records",
     {
@@ -144,7 +144,7 @@ export function registerRecordTools(server: McpServer, auth: AgentAuth) {
           fetched.length > limit && last
             ? encodeExpenseCursor({ spentAt: last.spentAt, id: last.id })
             : null;
-        const records = await loadAgentRecords(
+        const records = await loadMcpRecords(
           args.groupId,
           page.map((r) => r.id),
           labels,
@@ -167,7 +167,7 @@ export function registerRecordTools(server: McpServer, auth: AgentAuth) {
     ({ groupId, recordId }) =>
       guarded(async () => {
         const { labels } = await openGroup(auth, groupId, "read");
-        const [record] = await loadAgentRecords(groupId, [recordId], labels);
+        const [record] = await loadMcpRecords(groupId, [recordId], labels);
         if (!record) throw new ToolError("not_found", "record not found");
         return ok(`record ${recordId}`, { record });
       }),
